@@ -21,16 +21,17 @@ import queue
 import threading
 from functools import lru_cache
 from fake_useragent import UserAgent
-from flask import Flask, send_file, jsonify
+from flask import Flask, jsonify
+import threading
+import os
 
 app = Flask(__name__)
 
 @app.route('/token.json')
 def show_token():
-    path = os.path.join(DIR_PATH, 'token.json')
-    if os.path.exists(path):
-        return send_file(path, mimetype='application/json')
-    return jsonify({"error": "Generating first token..."}), 404
+    global latest_token
+    # This shows the actual token string on your site
+    return jsonify({"validate_token": latest_token})
 
 warnings.filterwarnings("ignore", category=torch.serialization.SourceChangeWarning)
 warnings.filterwarnings("ignore", message=".*SIFT_create.*deprecated.*")
@@ -142,7 +143,7 @@ def get_sift_detector():
 
 # ============ CONSTANTS ============
 file_lock = threading.Lock()
-TOKEN_OUTPUT_FILE = os.path.join(DIR_PATH, 'validated_tokens.txt') # Added for local saving
+#TOKEN_OUTPUT_FILE = os.path.join(DIR_PATH, 'validated_tokens.txt') # Added for local saving
 
 # Configuration from bypasser-og.py
 REFERER = "https://mtacc.mobilelegends.com/"
@@ -790,24 +791,14 @@ class Dun163:
             return [{"x": 80, "y": 70}, {"x": 160, "y": 120}, {"x": 240, "y": 90}]
     
     def save_token_locally(self, validate_token):
-        """Saves the latest token to a JSON file for the website."""
+        global latest_token
         try:
-            # Create a clean dictionary for JSON (Indented 12 spaces)
-            data = {
-                "token": validate_token,
-                "updated_at": datetime.now().strftime("%H:%M:%S"),
-                "status": "active"
-            }
-            
-            with file_lock:
-                # We use 'w' to overwrite so the site always shows the NEWEST token
-                json_file_path = os.path.join(DIR_PATH, 'token.json')
-                with open(json_file_path, 'w') as f:
-                    json.dump(data, f, indent=4)
-            
+            # Put the new token into the global variable
+            latest_token = validate_token
+            logger.success(f"T-{self.thread_id} | Website updated with new token")
             return True
         except Exception as e:
-            logger.error(f"T-{self.thread_id} | JSON save error: {e}")
+            logger.error(f"Error updating website: {e}")
             return False
     
     def run(self, attempt_num=0):
