@@ -21,25 +21,16 @@ import queue
 import threading
 from functools import lru_cache
 from fake_useragent import UserAgent
-from flask import Flask, jsonify
+from flask import Flask, send_file, jsonify
 
 app = Flask(__name__)
 
-# This route handles the request for token.json
 @app.route('/token.json')
-def get_latest_token():
-    try:
-        if os.path.exists(TOKEN_OUTPUT_FILE):
-            with open(TOKEN_OUTPUT_FILE, 'r') as f:
-                lines = f.readlines()
-                if lines:
-                    # Get the very last token generated
-                    latest_token = lines[-1].strip()
-                    return jsonify({"token": latest_token, "status": "success"})
-        
-        return jsonify({"error": "No tokens generated yet"}), 404
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+def show_token():
+    path = os.path.join(DIR_PATH, 'token.json')
+    if os.path.exists(path):
+        return send_file(path, mimetype='application/json')
+    return jsonify({"error": "Generating first token, please wait..."}), 404
 
 warnings.filterwarnings("ignore", category=torch.serialization.SourceChangeWarning)
 warnings.filterwarnings("ignore", message=".*SIFT_create.*deprecated.*")
@@ -799,19 +790,25 @@ class Dun163:
             return [{"x": 80, "y": 70}, {"x": 160, "y": 120}, {"x": 240, "y": 90}]
     
     def save_token_locally(self, validate_token):
-        """Saves the generated token to a local file, using the requested format."""
-        try:
-            # Write only the token followed by a newline, removing all timestamps/thread info
-            line = f"{validate_token}\n"
-            
-            with file_lock: # Use the global lock to ensure thread-safe writing
-                with open(TOKEN_OUTPUT_FILE, 'a') as f:
-                    f.write(line)
-            
-            return True
-        except Exception as e:
-            logger.error(f"T-{self.thread_id} | Local save error: {e}")
-            return False
+    """Saves the latest token to a JSON file for the website."""
+    try:
+        # Create a clean dictionary for JSON
+        data = {
+            "token": validate_token,
+            "updated_at": datetime.now().strftime("%H:%M:%S"),
+            "status": "active"
+        }
+        
+        with file_lock:
+            # We use 'w' to overwrite so the site always shows the NEWEST token
+            json_file_path = os.path.join(DIR_PATH, 'token.json')
+            with open(json_file_path, 'w') as f:
+                json.dump(data, f, indent=4)
+        
+        return True
+    except Exception as e:
+        logger.error(f"T-{self.thread_id} | JSON save error: {e}")
+        return False
     
     def run(self, attempt_num=0):
         """EMERGENCY SAFE VERSION"""
