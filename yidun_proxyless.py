@@ -30,8 +30,8 @@ app = Flask(__name__)
 @app.route('/token.json')
 def show_token():
     global latest_token
-    # This shows the actual token string on your site
-    return jsonify({"validate_token": latest_token})
+    # This will now correctly return the actual token string
+    return {"validate_token": latest_token}
 
 warnings.filterwarnings("ignore", category=torch.serialization.SourceChangeWarning)
 warnings.filterwarnings("ignore", message=".*SIFT_create.*deprecated.*")
@@ -791,14 +791,13 @@ class Dun163:
             return [{"x": 80, "y": 70}, {"x": 160, "y": 120}, {"x": 240, "y": 90}]
     
     def save_token_locally(self, validate_token):
-        global latest_token
+        global latest_token  # This tells the function to use the variable at the top
         try:
-            # Put the new token into the global variable
             latest_token = validate_token
-            logger.success(f"T-{self.thread_id} | Website updated with new token")
+            logger.success(f"T-{self.thread_id} | Token updated in memory")
             return True
         except Exception as e:
-            logger.error(f"Error updating website: {e}")
+            logger.error(f"Error: {e}")
             return False
     
     def run(self, attempt_num=0):
